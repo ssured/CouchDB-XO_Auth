@@ -44,34 +44,21 @@ param to _\_fb_.
 Build
 --------------------
 
-There is an unsophisticated Makefile with targets _compile_ and _install_. 
+Use Build CouchDB: https://github.com/iriscouch/build-couchdb
 
-In order to compile and install this module you might have to edit the Makefile and change one or more of _COUCH\_ROOT_, _\_COUCHDB\_ERLANG\_LIB_, _COUCHDB\_LOCALD_ and _COUCHDB\_INIT\_SCRIPT_ values to point to the appropriate directories and file within your couchdb installation.
-
+    rake plugin='git://github.com/iriscouch/CouchDB-XO_Auth origin/master'
 
 Installation
 -------------------
 
-You need to:
+Build CouchDB performed the installation already.
 
-* Copy the beam files to somewhere where couch can find it. That location could be something like couchdb/erlang/lib/couch-1.2/ebin/ depending on where/how you've installed couch.
-
-* Create a [Facebook app](See http://developer.Facebook.com)
+Next, create a [Facebook app](http://developer.facebook.com).
 
 Configuration
 --------------------
-You'll need to add an ini file or ini entries in couch config to use this module.
 
-          [httpd_global_handlers]
-          _fb = {fb_auth, handle_fb_req}
- 
-          [fb]
-          client_id=1234567890
-          store_access_token=true
-          redirect_uri=http://my_awesome_app.com/_fb
-          client_secret=1234567890ABCDEF123456789
-          client_app_uri=http://my_awesome_app.com/home?
-
+See the Futon configuration section, under the `fb` section.
 
 **\_fb**  
   This is the couch location for the code that redirects the user to Facebook.
