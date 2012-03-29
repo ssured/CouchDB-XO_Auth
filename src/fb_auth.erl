@@ -189,13 +189,13 @@ process_facebook_access_token(Resp) ->
     % Extract the info we need
     case Resp of 
         {ok, "200", _, Body} ->
-            case string:tokens(Body, "=") of
-                ["access_token", AccessToken] ->
-                    ?LOG_DEBUG("process_facebook_access_token: access_token=~p",[AccessToken]),
-                    {ok, AccessToken};
-                _ ->
+            case qs_get_value(Body, "access_token") of
+                undefined ->
                     ?LOG_DEBUG("process_facebook_access_token: unexpected response: ~p", [Body]),
-                    {error, "Unexpected body response from facebook"}
+                    {error, "Unexpected body response from facebook"};
+                AccessToken ->
+                    ?LOG_DEBUG("process_facebook_access_token: access_token=~p",[AccessToken]),
+                    {ok, AccessToken}
             end;
         _ ->
             ?LOG_DEBUG("process_facebook_access_token: non 200 response of: ~p", [Resp]),
@@ -219,15 +219,20 @@ process_access_token_extension(Resp) ->
     % Extract the info we need
     case Resp of 
         {ok, "200", _, Body} ->
-            case string:tokens(Body, "=") of
-                ["access_token", NewAccessToken] ->
-                    ?LOG_DEBUG("process_access_token_extension: access_token=~p",[NewAccessToken]),
-                    {ok, NewAccessToken};
-                _ ->
+            case qs_get_value(Body, "access_token") of
+                undefined ->
                     ?LOG_DEBUG("process_access_token_extension: unexpected response: ~p", [Body]),
-                    {error, "Unexpected body response from facebook"}
+                    {error, "Unexpected body response from facebook"};
+                NewAccessToken ->
+                    ?LOG_DEBUG("process_access_token_extension: access_token=~p",[NewAccessToken]),
+                    {ok, NewAccessToken}
             end;
         _ ->
             ?LOG_DEBUG("process_access_token_extension: non 200 response of: ~p", [Resp]),
             {error, "Non 200 response from facebook"}
     end.
+
+qs_get_value(QueryString, Key) ->
+    Pairs = string:tokens(QueryString, "&"),
+    KVs = [ list_to_tuple(string:tokens(Pair, "=")) || Pair <- Pairs ],
+    couch_util:get_value(Key, KVs).
