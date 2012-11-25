@@ -1,11 +1,12 @@
-{ application, xo_auth
-, [ {description, "CouchDB authorisation against external OAuth providers (Twitter, Facebook)"}
-  , {vsn, "0.1.0"}
-  , {registered, []}
-  , {applications, [ kernel
-                   , stdlib
-                   ]}
-  , {mod, { xo_auth_app, []}}
-  , {env, []}
-  ]
-}.
+{application, xo_auth,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { xo_auth_app, []}},
+  {env, []}
+ ]}.

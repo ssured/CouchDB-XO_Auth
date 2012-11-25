@@ -5,18 +5,19 @@ This is a rewrite of the couchdb-facebook authentication module in a more generi
 
 This version has been tested against CouchDB 1.2.x
 
-This initial implementation adds a Facebook authentication module that uses the
-[Facebook authentication API](http://developers.Facebook.com/docs/authentication/ ) to log people in.
+This version supports authenticating users using:
+ 
+- [Facebook API](http://developers.Facebook.com/docs/authentication/ ) 
 
-It consists of a CouchDB httpd\_global\_handler that responds to http GET requests and
-processes the Facebook login sequence. Once logged in, the handler requests an access
-code and retrieves the Facebook profile information via https://graph.Facebook.com/me. The user's Facebook ID can
-then be used to retrieve the CouchDB users document from the authentication_db to create the CouchDB session. The access code is stored
-in the user record. If there isn't a matching user record then one is created using the Facebook ID as the username
+- [Twitter API](https://dev.twitter.com/docs/auth/using-oauth/ ) 
 
-An error during Facebook login will return HTTP 403 to the original caller. 
+It consists of a CouchDB httpd\_global\_handlers that responds to http GET requests and processes the appropriate login sequence. Once authenticated by the external system the handler requests an access code and retrieves profile information which is used to retrieve the CouchDB users document from the authentication_db. If there isn't a matching user record then one is created using the ID provided by the external system
 
-Example Flow of Control
+An error during login will return HTTP 403 to the original caller. 
+
+This version also supports adding Facebook or Twitter login to existing CouchDB user accounts. If HTTP requests to CouchDB made during the external authentication redirection flow contain either an active CouchDB session cookie or the appropriate OAuth headers then the access token/secret received from Twitter or Facebook will be stored in the _user document related to the authenticated user.
+
+Example Facebook Authentication Flow of Control
 ---------------------------
  
 For our example we assume the app is hosted at my_site.com
@@ -25,7 +26,7 @@ For our example we assume the app is hosted at my_site.com
    https://www.facebook.com/dialog/oauth?client_id=249348058430770&scope=user_about_me&redirect_uri=http:%2F%2Fmy_site.com:5984%2F_fb
 2. The user logs into Facebook (if not already logged in) and approves the app (if
 not already approved). NOTE: If the user was already logged in and has already approved the app then
-they will be redirected back to your app without needing to type anything.
+they will be redirected back without needing to type anything.
 4. The browser arrives back at the _\_fb with a code that allows this module
 to contact Facebook via the API and request an Access Code. No user interaction
 required.
@@ -41,6 +42,24 @@ a combination of _client\_app\_uri_ config directive and the _clientapptoken_
 param to _\_fb_.
 
 
+Example Twitter Authentication Flow of Control
+---------------------------
+ 
+For our example we assume the app is hosted at my_site.com
+
+1. The browser requests the link:
+   https://my_site.com:5984%2F_twitter
+2. The user logs into Twitter (if not already logged in) and approves the app (if
+not already approved). NOTE: If the user was already logged in and has already approved the app then
+they will be redirected back without needing to type anything.
+4. The browser arrives back at _\_twitter with a code that allows the module
+to contact Twitter and request an Access Code. 
+5. When the Access Code is returned the user's Twitter screen name and ID are also returned. A couchDB username is created 
+and the ID along with the access token & secret are optionally stored. Storing
+the access token and secret allows server components to access Twitter on the user's behalf.
+6. The final act is to redirect the user to the url configured by the  _client\_app\_uri_ config entry
+
+
 Build
 --------------------
 
@@ -53,10 +72,23 @@ Installation
 
 Build CouchDB performed the installation already.
 
-Next, create a [Facebook app](http://developer.facebook.com).
+* Optionally create a [Facebook app](See http://developer.facebook.com)
 
-Configuration
+* Optionally create a [Twitter app](See http://dev.twitter.com)
+
+Facebook Configuration
 --------------------
+To add Facebook authentication the following entries are required in the xo_auth.ini file
+
+          [httpd_global_handlers]
+          _fb = {xo_auth_fb, handle_fb_req}
+ 
+          [fb]
+          client_id=1234567890
+          store_access_token=true
+          redirect_uri=http://my_awesome_app.com/_fb
+          client_secret=1234567890ABCDEF123456789
+          client_app_uri=http://my_awesome_app.com/home?
 
 See the Futon configuration section, under the `fb` section.
 
@@ -69,14 +101,14 @@ See the Futon configuration section, under the `fb` section.
   NOTE: Facebook requires that your site is public. The 'Site URL' setting of
         the Facebook app needs to be set to your site.
         
-**client_id**  
+**client\_id**  
   The App ID of your Facebook app
 
-**store_access_token**
+**store\_access\_token**
   This defaults to false. Setting it to true means that the user's Access Token will be saved in
   the \_user database allowing server components to access the user's external account
   
-**redirect_uri**  
+**redirect\_uri**  
   This is the location that Facebook will be told to return the user to when
   Facebook login is complete. This MUST start with the same location that you set
   for Site URL in the Facebook app
@@ -91,10 +123,65 @@ See the Futon configuration section, under the `fb` section.
   will be redirected to. Any value passed to the initial _\_fb__ call param _clientapptoken_ will be
   appended to this URL.
 
+Twitter Configuration
+--------------------
+
+To add Twitter authentication the following entries are required in the xo_auth.ini file
+
+          [httpd_global_handlers]
+          _twitter = {xo_auth_twitter, handle_twitter_req}
+ 
+          [twitter]
+          client_id=1234567890
+          store_access_token=true
+          redirect_uri=http://my_awesome_app.com/_twitter
+          client_secret=1234567890ABCDEF123456789
+          client_app_uri=http://my_awesome_app.com/home?
+
+          [blowfish]
+          key=D67051C4C560B93818091AC4C461375B
+          ivec=BC7FB2B980470D69
+
+
+**\_twitter**  
+  This is the CouchDB location for the code that handles Twitter Authentication.
+        
+**client\_id**  
+  The _Consumer Key_ of your Twitter app
+
+**client\_secret**  
+  DO NOT PUBLISH THIS! It is the _Consumer Secret_ from your Twitter app.
+  It is used behind the scenes to contact Twitter. If anyone gets hold
+  of this they can pretend to be your app. Beware!
+
+**store\_access\_token**
+  This defaults to false. Setting it to true means that the user's Access Token & Secret will be saved in
+  the \_user database allowing server components to access the user's external account
+  
+**redirect_uri**  
+  This is the same as the _Callback URL_ configured for the Twitter App 
+
+**client\_app\_uri**  
+  Once the Twitter and CouchDB login have completed this is the URL that the initial call
+  will be redirected to. 
+
+
+**blowfish** The Twitter Authentication module uses Blowfish to encrypt a temporary cookie. Blowfish was chosen over AES
+because the Erlang crypto module in Ubuntu 10.04 doesn't support AES. _key_ is an arbitaty value upto 56 bytes in length, but must also be a multiple of 8 bytes, _ivec_ is an arbitary 64 bit value (8 bytes)
+
+Username control
+----------------
+          [xo_auth]
+          illegal_username_prefixes=foo,bar
+          illegal_username_prepend=prefix
+
+This configuration provides limited control over the automatic username generation. If generated usernames start with any of the prefixes in *illegal_username_prefixes* then the generated username will be prefixed with *illegal_username_prepend*
+
+
 Notes
 ---------------
 
-The users ID on the external system and the access token are stored in the user document in the authenticatio database as follows:
+The users ID on the external system and the access token are stored in the user document in the authentication database as follows:
 
     {
        "_id": "org.couchdb.user:michaelcollins14795",
@@ -111,6 +198,7 @@ The users ID on the external system and the access token are stored in the user 
     }
 
 Adding a section to an existing user document that contains the *facebook* section with the ID and a blank access_token would allow that user to be authenticated via Facebook.
+
 
 
 License
